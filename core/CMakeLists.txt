@@ -69,6 +69,9 @@ INCLUDE(BareosExtractVersionInfo)
 
 INCLUDE(BareosFindAllLibraries)
 
+
+
+
 IF (coverage)
    set(COVERAGE_COMPILER_FLAGS "-g -O0 --coverage -fprofile-arcs -ftest-coverage" CACHE INTERNAL "")
    MESSAGE(STATUS "coverage requested, adding COVERAGE_COMPILER_FLAGS : ${COVERAGE_COMPILER_FLAGS}")
@@ -125,6 +128,7 @@ if (${CMAKE_SYSTEM_NAME} MATCHES "Windows")
       ${CMAKE_SOURCE_DIR}/src/win32/include
       ${CMAKE_SOURCE_DIR}/src/win32/compat/include
       )
+   
    set(HAVE_WIN32 1)
 
    set(WINDOWS_LIBRARIES ws2_32)
@@ -148,6 +152,11 @@ ENDIF()
 
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall")
+
+if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-deprecated-register")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-deprecated-register")
+endif()
 
 INCLUDE(BareosFindPrograms)
 
@@ -444,6 +453,9 @@ if ("${READLINE_FOUND}")
    set(HAVE_READLINE 1)
 endif()
 
+if ("${PAM_FOUND}")
+   set(HAVE_PAM 1)
+endif()
 
 
 set(have_tls "${HAVE_TLS}" )
@@ -472,16 +484,15 @@ set(build_dird "${build-dird}" )
 set(build_stored "${build-stored}" )
 set(have_plugins "${have_plugins}" )
 set(have_afs "" )
-#set(have_acl "" )
 
-if(${acl} AND ${ACL_FOUND})
+if(${HAVE_SYS_ACL_H})
    set(HAVE_ACL 1)
-   Message(STATUS "acl found: ${ACL_LIBS}")
+   Message(STATUS "acl found, libs: ${ACL_LIBS}")
 endif()
 
-if(${HAVE_SYS_XATTR_H})
+if("${HAVE_SYS_XATTR_H}" OR "${HAVE_SYS_EXTATTR_H}")
    set(HAVE_XATTR 1)
-   set(have_xattr ${HAVE_SYS_XATTR_H})
+   set(have_xattr YES)
 endif()
 
 if(${HAVE_RADOS_LIBRADOS_H})
@@ -650,6 +661,7 @@ MESSAGE("   TLS support:                  ${have_tls} ")
 MESSAGE("   Encryption support:           ${have_crypto} ")
 MESSAGE("   OpenSSL support:              ${OPENSSL_FOUND} ${OPENSSL_VERSION} ${OPENSSL_INCLUDE_DIR} ${OPENSSL_LIBRARIES} ")
 MESSAGE("   GNUTLS support:               ${have_gnutls} ")
+MESSAGE("   PAM support:                  ${PAM_FOUND} ${PAM_LIBRARIES} ${PAM_INCLUDE_DIRS} ")
 MESSAGE("   ZLIB support:                 ${ZLIB_FOUND} ${ZLIB_LIBRARIES} ${ZLIB_INCLUDE_DIRS} ")
 MESSAGE("   LZO2 support:                 ${LZO2_FOUND} ${LZO2_LIBRARIES} ${LZO2_INCLUDE_DIRS} ")
 MESSAGE("   FASTLZ support:               ${FASTLZ_FOUND} ${FASTLZ_LIBRARIES} ${FASTLZ_INCLUDE_DIRS} ")
@@ -666,7 +678,7 @@ MESSAGE("   build-dird:                   ${build_dird} ")
 MESSAGE("   build-stored:                 ${build_stored} ")
 MESSAGE("   Plugin support:               ${have_plugins} ")
 MESSAGE("   AFS support:                  ${have_afs} ")
-MESSAGE("   ACL support:                  ${acl} ${ACL_FOUND} ${ACL_LIBS}")
+MESSAGE("   ACL support:                  ${HAVE_ACL} ${ACL_LIBS}")
 MESSAGE("   XATTR support:                ${have_xattr} ")
 MESSAGE("   SCSI Crypto support:          ${scsi-crypto} ${HAVE_LOWLEVEL_SCSI_INTERFACE} ")
 MESSAGE("   GFAPI(GLUSTERFS) support:     ${GFAPI_FOUND} ${GFAPI_LIBRARIES} ${GFAPI_INCLUDE_DIRS} ")

@@ -28,6 +28,9 @@
 
 #include "include/bareos.h"
 #include "dird.h"
+#include "dird/dird_globals.h"
+
+namespace directordaemon {
 
 /* Forward referenced functions */
 
@@ -41,7 +44,7 @@ bool UaContext::AuditEventWanted(bool audit_event_enabled)
    }
 
    if (audit_event_enabled) {
-      const char *event;
+      const char *event = nullptr;
 
       foreach_alist(event, me->audit_events) {
          if (Bstrcasecmp(event, argk[0])) {
@@ -142,3 +145,4 @@ void UaContext::LogAuditEventCmdline()
 
    Emsg3(M_AUDIT, 0, _("Console [%s] from [%s] cmdline %s\n"), console_name, host, cmd);
 }
+} /* namespace directordaemon */

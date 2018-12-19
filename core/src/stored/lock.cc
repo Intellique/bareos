@@ -31,11 +31,7 @@
 #include "stored/stored.h"                   /* pull in Storage Daemon headers */
 #include "lib/edit.h"
 
-#ifdef SD_DEBUG_LOCK
-const int debuglevel = 0;
-#else
-const int debuglevel = 500;
-#endif
+namespace storagedaemon {
 
 /**
  * The Storage daemon has three locking concepts that must be understood:
@@ -519,3 +515,5 @@ bool Device::IsDeviceUnmounted()
 
    return status;
 }
+
+} /* namespace storagedaemon */

@@ -32,7 +32,10 @@
 #include "cats/cats_backends.h"
 #include "lib/runscript.h"
 #include "dird/dird_conf.h"
+#include "dird/dird_globals.h"
 #include "lib/edit.h"
+
+using namespace directordaemon;
 
 extern bool ParseDirConfig(const char *configfile, int exit_code);
 
@@ -66,9 +69,6 @@ static const char *idx_tmp_name;
 #if defined(HAVE_DYNAMIC_CATS_BACKENDS)
 static const char *backend_directory = _PATH_BAREOS_BACKENDDIR;
 #endif
-
-DirectorResource *me = NULL;                    /* Our Global resource */
-ConfigurationParser *my_config = nullptr;             /* Our Global config */
 
 #define MAX_ID_LIST_LEN 10000000
 
@@ -290,118 +290,6 @@ typedef struct s_idx_list {
    int  count_key; /* how many times the index meets *key_name */
    int  CountCol; /* how many times meets the desired column name */
 } IDX_LIST;
-
-static IDX_LIST idx_list[MAXIDX];
-
-/**
- * Called here with each table index to be added to the list
- */
-static int CheckIdxHandler(void *ctx, int num_fields, char **row)
-{
-   /*
-    * Table | Non_unique | Key_name | Seq_in_index | Column_name |...
-    * File  |          0 | PRIMARY  |            1 | FileId      |...
-    */
-   char *name, *key_name, *col_name;
-   int i, len;
-   int found = false;
-
-   name = (char *)ctx;
-   key_name = row[2];
-   col_name = row[4];
-   for(i = 0; (idx_list[i].key_name != NULL) && (i < (MAXIDX - 1)); i++) {
-      if (Bstrcasecmp(idx_list[i].key_name, key_name)) {
-         idx_list[i].count_key++;
-         found = true;
-         if (Bstrcasecmp(col_name, name)) {
-            idx_list[i].CountCol++;
-         }
-         break;
-      }
-   }
-   /*
-    * If the new Key_name, add it to the list
-    */
-   if (!found) {
-      len = strlen(key_name) + 1;
-      idx_list[i].key_name = (char *)malloc(len);
-      bstrncpy(idx_list[i].key_name, key_name, len);
-      idx_list[i].count_key = 1;
-      if (Bstrcasecmp(col_name, name)) {
-         idx_list[i].CountCol = 1;
-      } else {
-         idx_list[i].CountCol = 0;
-      }
-   }
-   return 0;
-}
-
-/**
- * Return TRUE if "one column" index over *col_name exists
- */
-static bool CheckIdx(const char *col_name)
-{
-   int i;
-   int found = false;
-   const char *query = "SHOW INDEX FROM File";
-
-   switch (db->GetTypeIndex()) {
-   case SQL_TYPE_MYSQL:
-      memset(&idx_list, 0, sizeof(idx_list));
-      if (!db->SqlQuery(query, CheckIdxHandler, (void *)col_name)) {
-         printf("%s\n", db->strerror());
-         fflush(stdout);
-      }
-      for (i = 0; (idx_list[i].key_name != NULL) && (i < (MAXIDX - 1)) ; i++) {
-         /*
-          * NOTE : if (idx_list[i].count_key > 1) then index idx_list[i].key_name is "multiple-column" index
-          */
-         if ((idx_list[i].count_key == 1) && (idx_list[i].CountCol == 1)) {
-            /*
-             * "one column" index over *col_name found
-             */
-            found = true;
-         }
-      }
-      if (found) {
-         if (verbose) {
-            printf(_("Ok. Index over the %s column already exists and dbcheck will work faster.\n"), col_name);
-         }
-      } else {
-         printf(_("Note. Index over the %s column not found, that can greatly slow down dbcheck.\n"), col_name);
-      }
-      fflush(stdout);
-      return found;
-   default:
-      return true;
-   }
-}
-
-/**
- * Create temporary one-column index
- */
-static bool create_tmp_idx(const char *idx_name, const char *table_name,
-                           const char *col_name)
-{
-   idx_tmp_name = NULL;
-   printf(_("Create temporary index... This may take some time!\n"));
-   fflush(stdout);
-   Bsnprintf(buf, sizeof(buf), "CREATE INDEX %s ON %s (%s)", idx_name, table_name, col_name);
-   if (verbose) {
-      printf("%s\n", buf);
-   }
-   if (db->SqlQuery(buf, NULL, NULL)) {
-      idx_tmp_name = idx_name;
-      if (verbose) {
-         printf(_("Temporary index created.\n"));
-      }
-   } else {
-      printf("%s\n", db->strerror());
-      return false;
-   }
-   fflush(stdout);
-   return true;
-}
 
 /**
  * Drop temporary index
@@ -1238,7 +1126,7 @@ int main (int argc, char *argv[])
       }
       my_config = InitDirConfig(configfile, M_ERROR_TERM);
       my_config->ParseConfig();
-      LockRes();
+      LockRes(my_config);
       foreach_res(catalog, R_CATALOG) {
          if (catalogname && bstrcmp(catalog->hdr.name, catalogname)) {
             ++found;
@@ -1248,7 +1136,7 @@ int main (int argc, char *argv[])
            break;
          }
       }
-      UnlockRes();
+      UnlockRes(my_config);
       if (!found) {
          if (catalogname) {
             Pmsg2(0, _("Error can not find the Catalog name[%s] in the given config file [%s]\n"), catalogname, configfile);
@@ -1257,9 +1145,9 @@ int main (int argc, char *argv[])
          }
          exit(1);
       } else {
-         LockRes();
-         me = (DirectorResource *)GetNextRes(R_DIRECTOR, NULL);
-         UnlockRes();
+         LockRes(my_config);
+         me = (DirectorResource *)my_config->GetNextRes(R_DIRECTOR, NULL);
+         UnlockRes(my_config);
          if (!me) {
             Pmsg0(0, _("Error no Director resource defined.\n"));
             exit(1);

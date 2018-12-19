@@ -36,6 +36,7 @@
 
 #include "include/bareos.h"
 #include "dird.h"
+#include "dird/dird_globals.h"
 #include "dird/backup.h"
 #include "dird/fd_cmds.h"
 #include "dird/getmsg.h"
@@ -49,6 +50,8 @@
 #include "cats/sql.h"
 #include "lib/bnet.h"
 #include "lib/edit.h"
+
+namespace directordaemon {
 
 /* Commands sent to File daemon */
 static char backupcmd[] =
@@ -123,7 +126,7 @@ char* StorageAddressToContact(StorageResource *rstore, StorageResource *wstore)
 
 static inline bool ValidateStorage(JobControlRecord *jcr)
 {
-   StorageResource *store;
+   StorageResource *store = nullptr;
 
    foreach_alist(store, jcr->res.wstorage) {
       switch (store->Protocol) {
@@ -182,7 +185,7 @@ bool DoNativeBackupInit(JobControlRecord *jcr)
 static bool GetBaseJobids(JobControlRecord *jcr, db_list_ctx *jobids)
 {
    JobDbRecord jr;
-   JobResource *job;
+   JobResource *job = nullptr;
    JobId_t id;
    char str_jobid[50];
 
@@ -554,7 +557,7 @@ bool DoNativeBackup(JobControlRecord *jcr)
        * TLS Requirement
        */
 
-      tls_need = GetNeedFromConfiguration(client);
+      tls_need = GetLocalTlsPolicyFromConfiguration(store);
 
       connection_target_address = StorageAddressToContact(client, store);
 
@@ -564,11 +567,11 @@ bool DoNativeBackup(JobControlRecord *jcr)
       }
    } else {
 
-      /*
-       * TLS Requirement
-       */
-
-      tls_need = GetNeedFromConfiguration(me);
+      if (jcr->res.client->connection_successful_handshake_ != ClientConnectionHandshakeMode::kTlsFirst) {
+        tls_need = GetLocalTlsPolicyFromConfiguration(client);
+      } else {
+        tls_need = TlsConfigBase::BNET_TLS_AUTO;
+      }
 
       connection_target_address = ClientAddressToContact(client, store);
 
@@ -576,6 +579,7 @@ bool DoNativeBackup(JobControlRecord *jcr)
        * Tell the SD to connect to the FD.
        */
       sd->fsend(passiveclientcmd, connection_target_address, client->FDport, tls_need);
+      Bmicrosleep(2,0);
       if (!response(jcr, sd, OKpassiveclient, "Passive client", DISPLAY_ERROR)) {
          goto bail_out;
       }
@@ -1230,3 +1234,4 @@ void GenerateBackupSummary(JobControlRecord *jcr, ClientDbRecord *cr, int msg_ty
         secure_erase_status.c_str(),
         TermMsg);
 }
+} /* namespace directordaemon */

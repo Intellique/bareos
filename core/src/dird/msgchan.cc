@@ -45,6 +45,8 @@
 #include "lib/bnet.h"
 #include "lib/edit.h"
 
+namespace directordaemon {
+
 static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 
 /* Commands sent to Storage daemon */
@@ -150,7 +152,7 @@ static inline bool SendBootstrapFileToSd(JobControlRecord *jcr, BareosSocket *sd
 bool StartStorageDaemonJob(JobControlRecord *jcr, alist *rstore, alist *wstore, bool send_bsr)
 {
    bool ok = true;
-   StorageResource *storage;
+   StorageResource *storage = nullptr;
    char auth_key[100];
    const char *fileset_md5;
    PoolMem StoreName, device_name, pool_name, pool_type, media_type, backup_format;
@@ -164,7 +166,7 @@ bool StartStorageDaemonJob(JobControlRecord *jcr, alist *rstore, alist *wstore, 
    /*
     * Before actually starting a new Job on the SD make sure we send any specific plugin options for this Job.
     */
-   if (!DoStoragePluginOptions(jcr)) {
+   if (!SendStoragePluginOptions(jcr)) {
       Jmsg(jcr, M_FATAL, 0, _("Storage daemon rejected Plugin Options command: %s\n"), sd->msg);
       return false;
    }
@@ -292,7 +294,7 @@ bool StartStorageDaemonJob(JobControlRecord *jcr, alist *rstore, alist *wstore, 
          sd->fsend(use_storage, StoreName.c_str(), media_type.c_str(),
                    pool_name.c_str(), pool_type.c_str(), 0, copy, stripe);
          Dmsg1(100, "rstore >stored: %s", sd->msg);
-         DeviceResource *dev;
+         DeviceResource *dev = nullptr;
          /* Loop over alternative storage Devices until one is OK */
          foreach_alist(dev, storage->device) {
             PmStrcpy(device_name, dev->name());
@@ -330,7 +332,7 @@ bool StartStorageDaemonJob(JobControlRecord *jcr, alist *rstore, alist *wstore, 
                    pool_name.c_str(), pool_type.c_str(), 1, copy, stripe);
 
          Dmsg1(100, "wstore >stored: %s", sd->msg);
-         DeviceResource *dev;
+         DeviceResource *dev = nullptr;
          /* Loop over alternative storage Devices until one is OK */
          foreach_alist(dev, storage->device) {
             PmStrcpy(device_name, dev->name());
@@ -535,7 +537,7 @@ extern "C" void *device_thread(void *arg)
          Dmsg0(900, "Failed connecting to SD.\n");
          continue;
       }
-      LockRes();
+      LockRes(this);
       foreach_res(dev, R_DEVICE) {
          if (!UpdateDeviceRes(jcr, dev)) {
             Dmsg1(900, "Error updating device=%s\n", dev->name());
@@ -543,7 +545,7 @@ extern "C" void *device_thread(void *arg)
             Dmsg1(900, "Updated Device=%s\n", dev->name());
          }
       }
-      UnlockRes();
+      UnlockRes(this);
       jcr->store_bsock->close();
       delete jcr->store_bsock;
       jcr->store_bsock = NULL;
@@ -569,3 +571,5 @@ void InitDeviceResources()
    }
 }
 #endif
+
+} /* namespace directordaemon */

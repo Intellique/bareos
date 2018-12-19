@@ -31,9 +31,12 @@
 
 #include "include/bareos.h"
 #include "dird.h"
+#include "dird/dird_globals.h"
 #include "dird/sd_cmds.h"
 #include "dird/ndmp_dma_storage.h"
 #include "dird/storage.h"
+
+namespace directordaemon {
 
 /* Forward referenced functions */
 
@@ -76,7 +79,7 @@ void FreeRwstorage(JobControlRecord *jcr)
 void CopyRstorage(JobControlRecord *jcr, alist *storage, const char *where)
 {
    if (storage) {
-      StorageResource *store;
+      StorageResource *store = nullptr;
       if (jcr->res.rstorage) {
          delete jcr->res.rstorage;
       }
@@ -100,7 +103,7 @@ void CopyRstorage(JobControlRecord *jcr, alist *storage, const char *where)
  */
 void SetRstorage(JobControlRecord *jcr, UnifiedStorageResource *store)
 {
-   StorageResource *storage;
+   StorageResource *storage = nullptr;
 
    if (!store->store) {
       return;
@@ -140,7 +143,7 @@ void FreeRstorage(JobControlRecord *jcr)
 void CopyWstorage(JobControlRecord *jcr, alist *storage, const char *where)
 {
    if (storage) {
-      StorageResource *st;
+      StorageResource *st = nullptr;
       if (jcr->res.wstorage) {
          delete jcr->res.wstorage;
       }
@@ -166,7 +169,7 @@ void CopyWstorage(JobControlRecord *jcr, alist *storage, const char *where)
  */
 void SetWstorage(JobControlRecord *jcr, UnifiedStorageResource *store)
 {
-   StorageResource *storage;
+   StorageResource *storage = nullptr;
 
    if (!store->store) {
       return;
@@ -212,7 +215,7 @@ void FreeWstorage(JobControlRecord *jcr)
  */
 void SetPairedStorage(JobControlRecord *jcr)
 {
-   StorageResource *store, *pstore;
+   StorageResource *store = nullptr, *pstore = nullptr;
 
    switch (jcr->getJobType()) {
    case JT_BACKUP:
@@ -260,13 +263,13 @@ void SetPairedStorage(JobControlRecord *jcr)
           */
          jcr->res.pstorage = New(alist(10, not_owned_by_alist));
          foreach_alist(pstore, jcr->res.rstorage) {
-            store = (StorageResource *)GetNextRes(R_STORAGE, NULL);
+            store = (StorageResource *)my_config->GetNextRes(R_STORAGE, NULL);
             while (store) {
                if (store->paired_storage == pstore) {
                   break;
                }
 
-               store = (StorageResource *)GetNextRes(R_STORAGE, (CommonResourceHeader *)store);
+               store = (StorageResource *)my_config->GetNextRes(R_STORAGE, (CommonResourceHeader *)store);
             }
 
             /*
@@ -400,7 +403,7 @@ void FreePairedStorage(JobControlRecord *jcr)
  */
 bool HasPairedStorage(JobControlRecord *jcr)
 {
-   StorageResource *store;
+   StorageResource *store = nullptr;
 
    switch (jcr->getJobType()) {
    case JT_BACKUP:
@@ -457,7 +460,7 @@ bool SelectNextRstore(JobControlRecord *jcr, bootstrap_info &info)
       return true;                 /* Same SD nothing to change */
    }
 
-   if (!(ustore.store = (StorageResource *)GetResWithName(R_STORAGE,info.storage))) {
+   if (!(ustore.store = (StorageResource *)my_config->GetResWithName(R_STORAGE,info.storage))) {
       Jmsg(jcr, M_FATAL, 0,
            _("Could not get storage resource '%s'.\n"), info.storage);
       jcr->setJobStatus(JS_ErrorTerminated);
@@ -927,3 +930,4 @@ slot_number_t LookupStorageMapping(StorageResource *store, slot_type slot_type,
 
    return retval;
 }
+} /* namespace directordaemon */

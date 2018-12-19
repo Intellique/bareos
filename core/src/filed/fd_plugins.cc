@@ -29,6 +29,7 @@
  */
 #include "include/bareos.h"
 #include "filed/filed.h"
+#include "filed/filed_globals.h"
 #include "filed/accurate.h"
 #include "filed/heartbeat.h"
 #include "filed/fileset.h"
@@ -38,10 +39,20 @@
 #include "findlib/find_one.h"
 #include "findlib/hardlink.h"
 
-extern ClientResource *me;
-extern DLL_IMP_EXP char *exepath;
-extern DLL_IMP_EXP char *version;
-extern DLL_IMP_EXP char *dist_name;
+/**
+ * Function pointers to be set here (findlib)
+ */
+extern int (*plugin_bopen)(BareosWinFilePacket *bfd, const char *fname, int flags, mode_t mode);
+extern int (*plugin_bclose)(BareosWinFilePacket *bfd);
+extern ssize_t (*plugin_bread)(BareosWinFilePacket *bfd, void *buf, size_t count);
+extern ssize_t (*plugin_bwrite)(BareosWinFilePacket *bfd, void *buf, size_t count);
+extern boffset_t (*plugin_blseek)(BareosWinFilePacket *bfd, boffset_t offset, int whence);
+
+extern char *exepath;
+extern char *version;
+extern char *dist_name;
+
+namespace filedaemon {
 
 const int debuglevel = 150;
 #ifdef HAVE_WIN32
@@ -53,15 +64,6 @@ static alist *fd_plugin_list = NULL;
 static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 
 extern int SaveFile(JobControlRecord *jcr, FindFilesPacket *ff_pkt, bool top_level);
-
-/**
- * Function pointers to be set here
- */
-extern DLL_IMP_EXP int (*plugin_bopen)(BareosWinFilePacket *bfd, const char *fname, int flags, mode_t mode);
-extern DLL_IMP_EXP int (*plugin_bclose)(BareosWinFilePacket *bfd);
-extern DLL_IMP_EXP ssize_t (*plugin_bread)(BareosWinFilePacket *bfd, void *buf, size_t count);
-extern DLL_IMP_EXP ssize_t (*plugin_bwrite)(BareosWinFilePacket *bfd, void *buf, size_t count);
-extern DLL_IMP_EXP boffset_t (*plugin_blseek)(BareosWinFilePacket *bfd, boffset_t offset, int whence);
 
 /**
  * Forward referenced functions
@@ -329,7 +331,7 @@ bRC GeneratePluginEvent(JobControlRecord *jcr, bEventType eventType, void *value
    int len = 0;
    bool call_if_canceled = false;
    restore_object_pkt *rop;
-   bpContext *ctx;
+   bpContext *ctx = nullptr;
    alist *plugin_ctx_list;
    bRC rc = bRC_OK;
 
@@ -450,7 +452,7 @@ bail_out:
  */
 bool PluginCheckFile(JobControlRecord *jcr, char *fname)
 {
-   bpContext *ctx;
+   bpContext *ctx = nullptr;
    alist *plugin_ctx_list;
    int retval = bRC_OK;
 
@@ -572,7 +574,7 @@ bRC PluginOptionHandleFile(JobControlRecord *jcr, FindFilesPacket *ff_pkt, struc
    bRC retval = bRC_Core;
    bEvent event;
    bEventType eventType;
-   bpContext *ctx;
+   bpContext *ctx = nullptr;
    alist *plugin_ctx_list;
 
    cmd = ff_pkt->plugin;
@@ -650,7 +652,7 @@ int PluginSave(JobControlRecord *jcr, FindFilesPacket *ff_pkt, bool top_level)
    bRC retval;
    char *cmd;
    bEvent event;
-   bpContext *ctx;
+   bpContext *ctx = nullptr;
    struct save_pkt sp;
    bEventType eventType;
    PoolMem fname(PM_FNAME);
@@ -881,7 +883,7 @@ int PluginEstimate(JobControlRecord *jcr, FindFilesPacket *ff_pkt, bool top_leve
    bEventType eventType;
    PoolMem fname(PM_FNAME);
    PoolMem link(PM_FNAME);
-   bpContext *ctx;
+   bpContext *ctx = nullptr;
    alist *plugin_ctx_list;
    Attributes attr;
 
@@ -1089,7 +1091,7 @@ bool PluginNameStream(JobControlRecord *jcr, char *name)
    char *cmd;
    char *p = name;
    bool start;
-   bpContext *ctx;
+   bpContext *ctx = nullptr;
    alist *plugin_ctx_list;
 
    Dmsg1(debuglevel, "Read plugin stream string=%s\n", name);
@@ -1591,7 +1593,7 @@ bxattr_exit_code PluginParseXattrStreams(JobControlRecord *jcr,
 #if defined(HAVE_XATTR)
    plugin = (Plugin *)jcr->plugin_ctx->plugin;
    if (PlugFunc(plugin)->setXattr != NULL) {
-      xattr_t *current_xattr;
+      xattr_t *current_xattr = nullptr;
       struct xattr_pkt xp;
 
       xattr_value_list = New(alist(10, not_owned_by_alist));
@@ -1830,7 +1832,7 @@ void NewPlugins(JobControlRecord *jcr)
  */
 void FreePlugins(JobControlRecord *jcr)
 {
-   bpContext *ctx;
+   bpContext *ctx = nullptr;
 
    if (!fd_plugin_list || !jcr->plugin_ctx_list) {
       return;
@@ -2712,3 +2714,4 @@ int main(int argc, char *argv[])
 }
 
 #endif /* TEST_PROGRAM */
+} /* namespace filedaemon */

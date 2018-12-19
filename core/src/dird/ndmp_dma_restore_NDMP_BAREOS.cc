@@ -29,10 +29,13 @@
 
 #include "include/bareos.h"
 #include "dird.h"
+#include "dird/dird_globals.h"
 #include "dird/getmsg.h"
 #include "dird/msgchan.h"
 #include "dird/sd_cmds.h"
 #include "dird/storage.h"
+
+#include "lib/parse_bsr.h"
 
 #if HAVE_NDMP
 #include "dird/ndmp_dma_generic.h"
@@ -42,7 +45,11 @@
 
 #include "ndmp/ndmagents.h"
 #include "ndmp_dma_priv.h"
+#endif /* HAVE_NDMP */
 
+namespace directordaemon {
+
+#if HAVE_NDMP
 static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 
 /* Imported variables */
@@ -87,77 +94,6 @@ static inline char *lookup_fileindex(JobControlRecord *jcr, int32_t FileIndex)
    }
 
    return NULL;
-}
-
-/**
- * Add a filename to the files we want to restore.
- *
- * The RFC says this:
- *
- * original_path - The original path name of the data to be recovered,
- *                 relative to the backup root. If original_path is the null
- *                 string, the server shall recover all data contained in the
- *                 backup image.
- *
- * destination_path, name, other_name
- *               - Together, these identify the absolute path name to which
- *                 data are to be recovered.
- *
- *               If name is the null string:
- *                 - destination_path identifies the name to which the data
- *                   identified by original_path are to be recovered.
- *                 - other_name must be the null string.
- *
- *               If name is not the null string:
- *                 - destination_path, when concatenated with the server-
- *                   specific path name delimiter and name, identifies the
- *                   name to which the data identified by original_path are
- *                   to be recovered.
- *
- *               If other_name is not the null string:
- *                 - destination_path, when concatenated with the server-
- *                   specific path name delimiter and other_name,
- *                   identifies the alternate name-space name of the data
- *                   to be recovered. The definition of such alternate
- *                   name-space is server-specific.
- *
- * Neither name nor other_name may contain a path name delimiter.
- *
- * Under no circumstance may destination_path be the null string.
- *
- * If intermediate directories that lead to the path name to
- * recover do not exist, the server should create them.
- */
-static inline void AddToNamelist(struct ndm_job_param *job,
-                                   char *filename,
-                                   const char *restore_prefix,
-                                   char *name,
-                                   char *other_name,
-                                   int64_t node)
-{
-   ndmp9_name nl;
-   PoolMem destination_path;
-
-   memset(&nl, 0, sizeof(ndmp9_name));
-
-   /*
-    * See if the filename is an absolute pathname.
-    */
-   if (*filename == '\0') {
-      PmStrcpy(destination_path, restore_prefix);
-   } else if (*filename == '/') {
-      Mmsg(destination_path, "%s%s", restore_prefix, filename);
-   } else {
-      Mmsg(destination_path, "%s/%s", restore_prefix, filename);
-   }
-
-   nl.original_path = filename;
-   nl.destination_path = destination_path.c_str();
-   nl.name = name;
-   nl.other_name = other_name;
-   nl.node = node;
-
-   ndma_store_nlist(&job->nlist_tab, &nl);
 }
 
 /**
@@ -485,11 +421,11 @@ static inline bool DoNdmpRestoreBootstrap(JobControlRecord *jcr)
 {
    int cnt;
    BareosSocket *sd;
-   BootStrapRecord *bsr;
+   storagedaemon::BootStrapRecord *bsr;
    NIS *nis = NULL;
    int32_t current_fi;
    bootstrap_info info;
-   BsrFileIndex *fileindex;
+   storagedaemon::BsrFileIndex *fileindex;
    struct ndm_session ndmp_sess;
    struct ndm_job_param ndmp_job;
    bool session_initialized = false;
@@ -505,7 +441,7 @@ static inline bool DoNdmpRestoreBootstrap(JobControlRecord *jcr)
    /*
     * We first parse the BootStrapRecord ourself so we know what to restore.
     */
-   jcr->bsr = parse_bsr(jcr, jcr->RestoreBootstrap);
+   jcr->bsr = libbareos::parse_bsr(jcr, jcr->RestoreBootstrap);
    if (!jcr->bsr) {
       Jmsg(jcr, M_FATAL, 0, _("Error parsing bootstrap file.\n"));
       goto bail_out;
@@ -921,4 +857,6 @@ bool DoNdmpRestoreNdmpNative(JobControlRecord *jcr)
    Jmsg(jcr, M_FATAL, 0, _("NDMP protocol not supported\n"));
    return false;
 }
+
 #endif /* HAVE_NDMP */
+} /* namespace directordaemon */

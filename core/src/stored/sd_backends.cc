@@ -40,6 +40,8 @@
 #define RTLD_NOW 2
 #endif
 
+namespace storagedaemon {
+
 /**
  * Known backend to interface mappings.
  */
@@ -91,12 +93,12 @@ static inline backend_interface_mapping_t *lookup_backend_interface_mapping(int 
 Device *init_backend_dev(JobControlRecord *jcr, int device_type)
 {
    struct stat st;
-   char *backend_dir;
+   char *backend_dir = nullptr;
    void *dl_handle = NULL;
    PoolMem shared_library_name(PM_FNAME);
    PoolMem error(PM_FNAME);
    backend_interface_mapping_t *backend_interface_mapping;
-   backend_shared_library_t *backend_shared_library;
+   backend_shared_library_t *backend_shared_library = nullptr;
    t_backend_instantiate backend_instantiate;
    t_flush_backend flush_backend;
 
@@ -209,7 +211,7 @@ Device *init_backend_dev(JobControlRecord *jcr, int device_type)
 
 void DevFlushBackends()
 {
-   backend_shared_library_t *backend_shared_library;
+   backend_shared_library_t *backend_shared_library = nullptr;
 
    if (loaded_backends) {
       foreach_alist(backend_shared_library, loaded_backends) {
@@ -229,4 +231,7 @@ void DevFlushBackends()
       loaded_backends = NULL;
    }
 }
+
+} /* namespace storagedaemon */
+
 #endif /* HAVE_DYNAMIC_SD_BACKENDS */

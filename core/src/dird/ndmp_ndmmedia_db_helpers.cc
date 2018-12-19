@@ -30,8 +30,12 @@
 #include "dird.h"
 
 #if HAVE_NDMP
-
 #include "ndmp/ndmagents.h"
+#endif /* HAVE_NDMP */
+
+namespace directordaemon {
+
+#if HAVE_NDMP
 
 
 /**
@@ -179,7 +183,6 @@ bool GetNdmmediaInfoFromDatabase(ndm_media_table *media_tab, JobControlRecord  *
     * Find restore JobId
     */
    JobId_t  restoreJobId;
-   int status = 0;
    char *p = jcr->JobIds;
 
   /*
@@ -250,3 +253,5 @@ bail_out:
 #else
 
 #endif /* HAVE_NDMP */
+
+} /* namespace directordaemon */

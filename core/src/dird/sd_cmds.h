@@ -22,6 +22,13 @@
 #ifndef BAREOS_DIRD_SD_CMDS_H_
 #define BAREOS_DIRD_SD_CMDS_H_
 
+class JobControlRecord;
+
+namespace directordaemon {
+
+class UaContext;
+class StorageResource;
+
 bool ConnectToStorageDaemon(JobControlRecord *jcr, int retry_interval,
                                int max_retry_time, bool verbose);
 BareosSocket *open_sd_bsock(UaContext *ua);
@@ -41,6 +48,7 @@ bool NativeAutochangerVolumeOperation(UaContext *ua, StorageResource *store, con
 bool SendBwlimitToSd(JobControlRecord *jcr, const char *Job);
 bool SendSecureEraseReqToSd(JobControlRecord *jcr);
 bool DoStorageResolve(UaContext *ua, StorageResource *store);
-bool DoStoragePluginOptions(JobControlRecord *jcr);
+bool SendStoragePluginOptions(JobControlRecord *jcr);
 
+} /* namespace directordaemon */
 #endif // BAREOS_DIRD_SD_CMDS_H_

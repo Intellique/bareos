@@ -29,6 +29,7 @@
 
 #include "include/bareos.h"
 #include "dird.h"
+#include "dird/dird_globals.h"
 #include "dird/storage.h"
 #include "lib/edit.h"
 
@@ -42,6 +43,8 @@
 #include "dird/ndmp_dma_restore_common.h"
 #include "dird/ndmp_dma_generic.h"
 
+namespace directordaemon {
+
 /*
  * Fill the NDMP restore environment table with the data for the data agent to act on.
  */
@@ -49,12 +52,8 @@ static inline bool fill_restore_environment_ndmp_native(JobControlRecord *jcr,
                                             int32_t current_fi,
                                             struct ndm_job_param *job)
 {
-   int i;
-   char *bp;
    ndmp9_pval pv;
-   FilesetResource *fileset;
-   char *restore_pathname,
-        *ndmp_filesystem,
+   char *ndmp_filesystem,
         *restore_prefix;
    PoolMem tape_device;
    PoolMem destination_path;
@@ -256,9 +255,6 @@ int SetFilesToRestoreNdmpNative(JobControlRecord *jcr, struct ndm_job_param *job
  */
 static bool DoNdmpNativeRestore(JobControlRecord *jcr)
 {
-   int cnt;
-   BareosSocket *sd;
-   BootStrapRecord *bsr;
    NIS *nis = NULL;
    int32_t current_fi = 0;
    struct ndm_session ndmp_sess;
@@ -267,7 +263,6 @@ static bool DoNdmpNativeRestore(JobControlRecord *jcr)
    bool retval = false;
    int NdmpLoglevel;
    char mediabuf[100];
-   ndmmedia *media;
    slot_number_t ndmp_slot;
 
    if (jcr->res.client->ndmp_loglevel > me->ndmp_loglevel) {
@@ -522,4 +517,5 @@ bail_out:
    return false;
 }
 
+} /* namespace directordaemon */
 #endif /* HAVE_NDMP */

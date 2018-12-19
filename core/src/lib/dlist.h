@@ -54,7 +54,7 @@ struct dlink {
    void *prev;
 };
 
-class DLL_IMP_EXP dlist : public SmartAlloc {
+class dlist : public SmartAlloc {
    void *head;
    void *tail;
    int16_t loffset;
@@ -192,12 +192,19 @@ public:
    char *c_str() { return str_; }
 
 private:
+#ifdef __clang__
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wunused-private-field"
+#endif
    dlink link_;
+#ifdef __clang__
+#pragma clang diagnostic pop
+#endif
    char str_[1];
    /* !!! Don't put anything after this as this space is used
     *     to hold the string in inline
     */
 };
 
-DLL_IMP_EXP extern dlistString *new_dlistString(const char *str, int len);
-DLL_IMP_EXP extern dlistString *new_dlistString(const char *str);
+extern dlistString *new_dlistString(const char *str, int len);
+extern dlistString *new_dlistString(const char *str);

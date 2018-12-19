@@ -31,6 +31,7 @@
 
 #include "include/bareos.h"
 #include "dird.h"
+#include "dird/dird_globals.h"
 #include "findlib/match.h"
 
 #ifndef HAVE_REGEX_H
@@ -40,7 +41,16 @@
 #endif
 #include "findlib/find.h"
 
-/* Forward referenced subroutines */
+#include "inc_conf.h"
+#include "lib/edit.h"
+
+namespace directordaemon {
+
+typedef struct {
+  bool configured;
+  std::string default_value;
+} options_default_value_s;
+
 
 /*
  * Imported subroutines
@@ -108,9 +118,6 @@ ResourceItem options_items[] = {
    { "Meta", CFG_TYPE_META, { 0 }, 0, 0, 0, NULL, NULL },
    { NULL, 0, { 0 }, 0, 0, NULL, NULL, NULL }
 };
-
-#include "inc_conf.h"
-#include "lib/edit.h"
 
 /**
  * determine used compression algorithms
@@ -474,7 +481,8 @@ static void StoreMeta(LEX *lc, ResourceItem *item, int index, int pass)
 /**
  * New style options come here
  */
-static void StoreOption(LEX *lc, ResourceItem *item, int index, int pass)
+static void StoreOption(LEX *lc, ResourceItem *item, int index, int pass,
+                        std::map<int,options_default_value_s> &option_default_values)
 {
    int i;
    int keyword;
@@ -489,6 +497,9 @@ static void StoreOption(LEX *lc, ResourceItem *item, int index, int pass)
    for (i = 0; FS_option_kw[i].name; i++) {
       if (Bstrcasecmp(item->name, FS_option_kw[i].name)) {
          keyword = FS_option_kw[i].token;
+         if (option_default_values.find(keyword) != option_default_values.end()) {
+           option_default_values[keyword].configured = true;
+         }
          break;
       }
    }
@@ -543,6 +554,10 @@ static void SetupCurrentOpts(void)
 static void StoreOptionsRes(LEX *lc, ResourceItem *item, int index, int pass, bool exclude)
 {
    int token, i;
+   std::map<int,options_default_value_s> option_default_values = {
+     { INC_KW_ACL,   {false, "A"} },
+     { INC_KW_XATTR, {false, "X"} }
+   };
 
    if (exclude) {
       scan_err0(lc, _("Options section not permitted in Exclude\n"));
@@ -576,7 +591,7 @@ static void StoreOptionsRes(LEX *lc, ResourceItem *item, int index, int pass, bo
             /* Call item handler */
             switch (options_items[i].type) {
             case CFG_TYPE_OPTION:
-               StoreOption(lc, &options_items[i], i, pass);
+               StoreOption(lc, &options_items[i], i, pass, option_default_values);
                break;
             case CFG_TYPE_REGEX:
                StoreRegex(lc, &options_items[i], i, pass);
@@ -609,6 +624,19 @@ static void StoreOptionsRes(LEX *lc, ResourceItem *item, int index, int pass, bo
       if (i >=0) {
          scan_err1(lc, _("Keyword %s not permitted in this resource"), lc->str);
       }
+   }
+
+   /* apply default values for unset options */
+   if (pass == 1) {
+     for (auto const &o : option_default_values) {
+        int keyword_id = o.first;
+        bool was_set_in_config = o.second.configured;
+        std::string default_value = o.second.default_value;
+        if (!was_set_in_config) {
+           bstrncat(res_incexe.current_opts->opts, default_value.c_str(), MAX_FOPTS);
+           Dmsg2(900, "setting default value for keyword-id=%d, %s\n", keyword_id, default_value.c_str());
+        }
+     }
    }
 }
 
@@ -845,3 +873,4 @@ json_t *json_options(const int type)
    return json_datatype(type, options_items);
 }
 #endif
+} /* namespace directordaemon */

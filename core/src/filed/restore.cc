@@ -30,8 +30,10 @@
 
 #include "include/bareos.h"
 #include "filed/filed.h"
+#include "filed/filed_globals.h"
 #include "filed/compression.h"
 #include "filed/crypto.h"
+#include "filed/restore.h"
 #include "filed/verify.h"
 #include "include/ch.h"
 #include "findlib/create_file.h"
@@ -47,6 +49,11 @@
 
 #if defined(HAVE_DARWIN_OS)
 #include <sys/attr.h>
+#endif
+
+namespace filedaemon {
+
+#if defined(HAVE_DARWIN_OS)
 const bool have_darwin_os = true;
 #else
 const bool have_darwin_os = false;
@@ -159,7 +166,7 @@ static inline bool RestoreFinderinfo(JobControlRecord *jcr, POOLMEM *buf, int32_
  */
 static inline void DropDelayedDataStreams(r_ctx &rctx, bool reuse)
 {
-   DelayedDataStream *dds;
+   DelayedDataStream *dds = nullptr;
 
    if (!rctx.delayed_streams ||
        rctx.delayed_streams->empty()) {
@@ -268,7 +275,7 @@ static inline bool do_restore_xattr(JobControlRecord *jcr,
        * print the error message set by the lower level routine in jcr->errmsg.
        */
       if (jcr->xattr_data->u.parse->nr_errors < XATTR_REPORT_ERR_MAX_PER_JOB) {
-         Jmsg(jcr, M_WARNING, 0, "%s", jcr->errmsg);
+         Jmsg(jcr, M_ERROR, 0, "%s", jcr->errmsg);
       }
       jcr->xattr_data->u.parse->nr_errors++;
       break;
@@ -288,7 +295,7 @@ static inline bool do_restore_xattr(JobControlRecord *jcr,
  */
 static inline bool PopDelayedDataStreams(JobControlRecord *jcr, r_ctx &rctx)
 {
-   DelayedDataStream *dds;
+   DelayedDataStream *dds = nullptr;
 
    /*
     * See if there is anything todo.
@@ -418,9 +425,9 @@ void DoRestore(JobControlRecord *jcr)
    sd = jcr->store_bsock;
    jcr->setJobStatus(JS_Running);
 
-   LockRes();
-   ClientResource *client = (ClientResource *)GetNextRes(R_CLIENT, NULL);
-   UnlockRes();
+   LockRes(my_config);
+   ClientResource *client = (ClientResource *)my_config->GetNextRes(R_CLIENT, NULL);
+   UnlockRes(my_config);
    if (client) {
       buf_size = client->max_network_buffer_size;
    } else {
@@ -1407,3 +1414,5 @@ void FreeSession(r_ctx &rctx)
       rctx.cs = NULL;
    }
 }
+
+} /* namespace filedaemon */

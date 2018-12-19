@@ -36,6 +36,8 @@
 #include "ndmp_dma_priv.h"
 #include "lmdb/lmdb.h"
 
+namespace directordaemon {
+
 /*
  * What is actually stored in the LMDB
  */
@@ -531,7 +533,6 @@ static inline void CalculatePath(uint64_t node, fhdb_state *fhdb_state)
 {
    PoolMem temp;
    int result = 0;
-   MDB_cursor *cursor;
    MDB_val rkey, rdata;
    struct fhdb_payload *payload;
    bool root_node_reached = false;
@@ -576,7 +577,6 @@ static inline void ProcessLmdb(NIS *nis, struct fhdb_state *fhdb_state)
 {
    int result;
    uint64_t node;
-   char *filename;
    MDB_cursor *cursor;
    int8_t FileType = 0;
    MDB_val rkey, rdata;
@@ -680,4 +680,6 @@ void NdmpFhdbLmdbProcessDb(struct ndmlog *ixlog)
 
    Jmsg0(nis->jcr, M_INFO, 0,  "Processing lmdb database done\n");
 }
+
+} /* namespace directordaemon */
 #endif /* HAVE_LMDB */

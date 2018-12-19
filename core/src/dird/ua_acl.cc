@@ -30,7 +30,10 @@
 
 #include "include/bareos.h"
 #include "dird.h"
+#include "dird/dird_globals.h"
 #include "lib/edit.h"
+
+namespace directordaemon {
 
 /**
  * Check if access is permitted to item in acl
@@ -242,7 +245,7 @@ bool UaContext::AclAccessOk(int acl, const char *item, int len, bool audit_event
     * If we didn't find a matching ACL try to use the profiles this console is connected to.
     */
    if (!retval && cons->profiles && cons->profiles->size()) {
-      ProfileResource *profile;
+      ProfileResource *profile = nullptr;
 
       foreach_alist(profile, cons->profiles) {
          retval = FindInAclList(profile->ACL_lists[acl], acl, item, len);
@@ -391,7 +394,7 @@ CommonResourceHeader *UaContext::GetResWithName(int rcode, const char *name, boo
       }
    }
 
-   return ::GetResWithName(rcode, name, lock);
+   return my_config->GetResWithName(rcode, name, lock);
 
 bail_out:
    return NULL;
@@ -443,3 +446,5 @@ ScheduleResource *UaContext::GetScheduleResWithName(const char *name, bool audit
 {
    return (ScheduleResource *)GetResWithName(R_SCHEDULE, name, audit_event, lock);
 }
+
+} /* namespace directordaemon */
